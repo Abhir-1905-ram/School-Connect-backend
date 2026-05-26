@@ -118,7 +118,9 @@ export async function getPaymentStats(
     monthlyCollections,
     revenueByPartner,
   ] = await Promise.all([
-    Payment.aggregate([{ $group: { _id: null, total: { $sum: "$amount" } } }]),
+    Client.aggregate([
+      { $group: { _id: null, total: { $sum: "$amountPaid" } } },
+    ]),
     Client.aggregate([
       {
         $project: {

@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { Client, PaymentStatus } from "../models/Client";
+import { Payment } from "../models/Payment";
 import { ApiResponse } from "../utils/ApiResponse";
 import { ApiError } from "../utils/ApiError";
 import { getPagination, buildPaginationMeta } from "../utils/pagination";
@@ -163,20 +164,37 @@ export async function updatePaymentStatus(
     throw new ApiError(400, "Invalid payment status");
   }
 
-  client.paymentStatus = paymentStatus;
+  let targetAmountPaid = client.amountPaid;
 
   if (amountPaid !== undefined) {
-    client.amountPaid = amountPaid;
+    targetAmountPaid = amountPaid;
   } else if (paymentStatus === "paid") {
-    client.amountPaid = client.dealValue;
+    targetAmountPaid = client.dealValue;
   } else if (paymentStatus === "unpaid") {
-    client.amountPaid = 0;
+    targetAmountPaid = 0;
   }
 
-  if (client.amountPaid > client.dealValue) {
+  if (targetAmountPaid > client.dealValue) {
     throw new ApiError(400, "Amount paid cannot exceed deal value");
   }
 
+  const collectionDelta = targetAmountPaid - client.amountPaid;
+
+  if (collectionDelta > 0) {
+    await Payment.create({
+      client: client._id,
+      partner: client.partner,
+      amount: collectionDelta,
+      paymentDate: new Date(),
+      recordedBy: req.user?.id,
+    });
+    const updated = await Client.findById(client._id);
+    ApiResponse.success(res, { client: updated }, "Payment status updated");
+    return;
+  }
+
+  client.paymentStatus = paymentStatus;
+  client.amountPaid = targetAmountPaid;
   await client.save();
 
   ApiResponse.success(res, { client }, "Payment status updated");
