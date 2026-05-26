@@ -10,12 +10,24 @@ function requireEnv(key: string): string {
   return value;
 }
 
+function parseClientUrls(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
+const clientUrls = parseClientUrls(requireEnv("CLIENT_URL"));
+
 export const env = {
   port: parseInt(process.env.PORT ?? "5000", 10),
   mongoUri: requireEnv("MONGO_URI"),
   jwtSecret: requireEnv("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
-  clientUrl: requireEnv("CLIENT_URL"),
+  /** First origin (legacy). */
+  clientUrl: clientUrls[0],
+  /** Allowed CORS origins (comma-separated in CLIENT_URL). */
+  clientUrls,
   nodeEnv: process.env.NODE_ENV ?? "development",
   isProduction: process.env.NODE_ENV === "production",
 } as const;
